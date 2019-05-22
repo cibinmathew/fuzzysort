@@ -333,12 +333,6 @@ USAGE:
       var typoSimpleI = 0;
       var matchesSimpleLen = 0;
 
-      /* Variables for excess typos search (in order not to mix up two search algorithms) */
-      var excessTyposMatchesSimple = [];
-      var excessTyposMatchesSimpleLen = 0;
-      var excessTyposSearchI = 0; // where we at
-      var excessTyposTargetI = 0; // where you at
-
       matchesSimple = []; // get clean array for each call
 
       /* Original search algorithm that reacts on missing letters */
@@ -387,6 +381,12 @@ USAGE:
       }
 
       if (matchesSimple.length < targetLen) {
+        /* Variables for excess typos search (in order not to mix up two search algorithms) */
+        var excessTyposMatchesSimple = [];
+        var excessTyposMatchesSimpleLen = 0;
+        var excessTyposSearchI = 0; // where we at
+        var excessTyposTargetI = 0; // where you at
+
         searchLowerCode = searchLowerCodes[0];
 
         /* Search algorithm that reacts on excess letters */
@@ -440,11 +440,15 @@ USAGE:
             break;
           }
         }
-      }
 
-      if (excessTyposMatchesSimple.length > matchesSimple.length) {
-        matchesSimple = excessTyposMatchesSimple;
-        matchesSimpleLen = excessTyposMatchesSimpleLen;
+        if (excessTyposMatchesSimple.length > matchesSimple.length) {
+          matchesSimple = excessTyposMatchesSimple;
+          matchesSimpleLen = excessTyposMatchesSimpleLen;
+        }
+
+        if ((targetLen - matchesSimpleLen) >= matchesSimpleLen) {
+          return null;
+        }
       }
 
       searchI = 0
@@ -460,13 +464,13 @@ USAGE:
       // Let's try a more advanced and strict test to improve the score
       // only count it as a match if it's consecutive or a beginning character!
       if(targetI !== targetLen)
-        for(;;) {
+        strictSearchLabel: for(;;) {
           if(targetI >= targetLen) {
             // We failed to find a good spot for this search char, go back to the previous search char and force it forward
             if(searchI <= 0) { // We failed to push chars forward for a better match
               // transpose, starting from the beginning
               ++typoStrictI; if(typoStrictI > searchLen-2) break
-              if(searchLowerCodes[typoStrictI] === searchLowerCodes[typoStrictI+1]) continue // doesn't make sense to transpose a repeat char
+              if(searchLowerCodes[matchesSimple[typoStrictI]] === searchLowerCodes[matchesSimple[typoStrictI+1]]) continue // doesn't make sense to transpose a repeat char
               targetI = firstPossibleI
               continue
             }
@@ -476,11 +480,9 @@ USAGE:
             targetI = nextBeginningIndexes[lastMatch]
 
           } else {
-            var searchLowerCode = searchLowerCodes[typoStrictI===0?searchI : (typoStrictI===searchI?searchI+1 : (typoStrictI===searchI-1?searchI-1 : searchI))];
+            var searchLowerCodeI = matchesSimple[typoStrictI===0?searchI : (typoStrictI===searchI?searchI+1 : (typoStrictI===searchI-1?searchI-1 : searchI))];
 
-            var isMatch = searchLowerCode === targetLowerCodes[targetI];
-
-            if(isMatch) {
+            if(searchLowerCodes[searchLowerCodeI] === targetLowerCodes[targetI]) {
               matchesStrict[matchesStrictLen++] = targetI
               ++searchI; if(searchI === searchLen) { successStrict = true; break }
               ++targetI
@@ -488,7 +490,7 @@ USAGE:
               targetI = nextBeginningIndexes[targetI]
             }
           }
-      }
+        }
 
       { // tally up the score & keep track of matches for highlighting later
         if(successStrict) {
