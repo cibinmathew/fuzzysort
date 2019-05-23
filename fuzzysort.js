@@ -328,207 +328,216 @@ USAGE:
       var targetLowerCodes = prepared._targetLowerCodes;
       var searchLen = searchLowerCodes.length;
       var targetLen = targetLowerCodes.length;
+      var isTypoExists = false;
       var searchI = 0; // where we at
       var targetI = 0; // where you at
-      var typoSimpleI = 0;
       var matchesSimpleLen = 0;
+      var score = 0;
 
-      matchesSimple = []; // get clean array for each call
+      /*  get clean array for each call */
+      matchesSimple = [];
 
-      /* Original search algorithm that reacts on missing letters */
-      mainSearchAlgorithm: for(;;) {
-        var isMatch = searchLowerCode === targetLowerCodes[targetI]
-        if(isMatch) {
-          matchesSimple[matchesSimpleLen++] = targetI
-          ++searchI; if(searchI === searchLen) break
-          searchLowerCode = searchLowerCodes[typoSimpleI===0?searchI : (typoSimpleI===searchI?searchI+1 : (typoSimpleI===searchI-1?searchI-1 : searchI))]
-        }
+      /* Search algorithm that reacts on excess letters */
+      for(;;) {
+        var targetLowerCode = targetLowerCodes[targetI];
 
-        if (searchLowerCode === spaceCharCode) {
-          ++searchI; if(searchI === searchLen) break
-          searchLowerCode = searchLowerCodes[typoSimpleI===0?searchI : (typoSimpleI===searchI?searchI+1 : (typoSimpleI===searchI-1?searchI-1 : searchI))]
-          --targetI;
-        }
+        if(searchLowerCode === targetLowerCode) {
+          matchesSimple[matchesSimpleLen++] = targetI;
+          ++searchI;
 
-        ++targetI; if(targetI >= targetLen) { // Failed to find searchI
-          // Check for typo or exit
-          // we go as far as possible before trying to transpose
-          // then we transpose backwards until we reach the beginning
-          for(;;) {
-            if(searchI <= 1) break mainSearchAlgorithm; // not allowed to transpose first char
-            if(typoSimpleI === 0) { // we haven't tried to transpose yet
-              --searchI
-              var searchLowerCodeNew = searchLowerCodes[searchI]
-              if(searchLowerCode === searchLowerCodeNew) continue // doesn't make sense to transpose a repeat char
-              typoSimpleI = searchI
-            } else {
-              if(typoSimpleI === 1) break mainSearchAlgorithm; // reached the end of the line for transposing
-              --typoSimpleI
-              searchI = typoSimpleI
-              searchLowerCode = searchLowerCodes[searchI + 1]
-              var searchLowerCodeNew = searchLowerCodes[searchI]
-              if(searchLowerCode === searchLowerCodeNew) continue // doesn't make sense to transpose a repeat char
-            }
-            matchesSimpleLen = searchI
-            targetI = matchesSimple[matchesSimpleLen - 1] + 1
-            break
+          if(searchI === searchLen) {
+            break;
           }
-        }
-      }
 
-      if (matchesSimple.length === 0) {
-        return null;
-      }
-
-      if (matchesSimple.length < targetLen) {
-        /* Variables for excess typos search (in order not to mix up two search algorithms) */
-        var excessTyposMatchesSimple = [];
-        var excessTyposMatchesSimpleLen = 0;
-        var excessTyposSearchI = 0; // where we at
-        var excessTyposTargetI = 0; // where you at
-
-        searchLowerCode = searchLowerCodes[0];
-
-        /* Search algorithm that reacts on excess letters */
-        for(;;) {
-          var targetLowerCode = targetLowerCodes[excessTyposTargetI];
-
-          if(searchLowerCode === targetLowerCode) {
-            excessTyposMatchesSimple[excessTyposMatchesSimpleLen++] = excessTyposTargetI;
-            ++excessTyposSearchI;
-            if(excessTyposSearchI === searchLen) break;
-            searchLowerCode = searchLowerCodes[excessTyposSearchI];
+          searchLowerCode = searchLowerCodes[searchI];
+        } else {
+          if (searchLowerCode === spaceCharCode) {
+            ++searchI;
+            --targetI;
           } else {
-            if (searchLowerCode === spaceCharCode) {
-              ++excessTyposSearchI;
-              --excessTyposTargetI;
-            } else {
-              var lastMatchI = excessTyposSearchI;
+            var lastMatchI = searchI;
 
-              for (var excessTyposIndex = 0; excessTyposIndex < typosNum; excessTyposIndex++) {
-                ++lastMatchI;
+            isTypoExists = true;
 
-                if(lastMatchI === searchLen) break;
-
-                searchLowerCode = searchLowerCodes[lastMatchI];
-
-                if (searchLowerCode === spaceCharCode) {
+            for (var excessTyposNumber = 0; excessTyposNumber < typosNum; excessTyposNumber++) {
+              /* Inner check on missing letters */
+              for (var missingCharsNumber = 1; missingCharsNumber <= typosNum; missingCharsNumber++) {
+                if (searchLowerCode === targetLowerCodes[targetI + missingCharsNumber]) {
                   ++lastMatchI;
-                  excessTyposSearchI = lastMatchI;
-                  continue;
-                }
-
-                if (searchLowerCode === targetLowerCodes[excessTyposTargetI]) {
-                  ++lastMatchI;
-                  excessTyposSearchI = lastMatchI;
-                  excessTyposMatchesSimple[excessTyposMatchesSimpleLen++] = excessTyposTargetI;
-                  typoSimpleI = 1;
+                  searchI = lastMatchI;
+                  matchesSimple[matchesSimpleLen++] = targetI + missingCharsNumber;
+                  targetI = targetI + missingCharsNumber;
                   break;
                 }
               }
+
+              ++lastMatchI;
+
+              if(lastMatchI === searchLen) {
+                break;
+              }
+
+              searchLowerCode = searchLowerCodes[lastMatchI];
+
+              if (searchLowerCode === spaceCharCode) {
+                ++lastMatchI;
+                searchI = lastMatchI;
+                continue;
+              }
+
+              if (searchLowerCode === targetLowerCodes[targetI]) {
+                ++lastMatchI;
+                searchI = lastMatchI;
+                matchesSimple[matchesSimpleLen++] = targetI;
+                break;
+              }
             }
-
-            if(excessTyposSearchI === searchLen || excessTyposTargetI === targetLen) break;
-
-            searchLowerCode = searchLowerCodes[excessTyposSearchI];
           }
 
-          ++excessTyposTargetI;
-
-          if (excessTyposTargetI >= targetLen
-              || excessTyposMatchesSimpleLen >= targetLen) {
+          if(searchI === searchLen
+              || targetI === targetLen) {
             break;
           }
+
+          searchLowerCode = searchLowerCodes[searchI];
         }
 
-        if (excessTyposMatchesSimple.length > matchesSimple.length) {
-          matchesSimple = excessTyposMatchesSimple;
-          matchesSimpleLen = excessTyposMatchesSimpleLen;
-        }
-
-        if ((targetLen - matchesSimpleLen) >= matchesSimpleLen) {
+        /* Check if first match is the first letter of the target */
+        if (matchesSimpleLen === 1
+            && matchesSimple[0] !== 0) {
           return null;
         }
+
+        ++targetI;
+
+        /* */
+        if (matchesSimpleLen === targetLen) {
+          if (!prepared._nextBeginningIndexes) {
+            prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target);
+          }
+
+          prepared.score = score;
+          prepared.indexes = new Array(matchesSimpleLen);
+
+          for(var i = matchesSimpleLen - 1; i >= 0; --i) {
+            prepared.indexes[i] = matchesSimple[i];
+          }
+
+          return prepared;
+        }
+
+        if (targetI >= targetLen) {
+          break;
+        }
       }
 
-      searchI = 0
-      var typoStrictI = 0
-      var successStrict = false
-      var matchesStrictLen = 0
+      if (matchesSimpleLen === 0) {
+        return null;
+      }
 
-      var nextBeginningIndexes = prepared._nextBeginningIndexes
-      if(nextBeginningIndexes === null) nextBeginningIndexes = prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target)
-      var firstPossibleI = targetI = matchesSimple[0]===0 ? 0 : nextBeginningIndexes[matchesSimple[0]-1]
+      console.log("matchesSimple: ", matchesSimple);
 
-      // Our target string successfully matched all characters in sequence!
-      // Let's try a more advanced and strict test to improve the score
-      // only count it as a match if it's consecutive or a beginning character!
+      searchI = 0;
+      var typoStrictI = 0;
+      var successStrict = false;
+      var matchesStrictLen = 0;
+      var nextBeginningIndexes = prepared._nextBeginningIndexes;
+
+      if(nextBeginningIndexes === null) {
+        nextBeginningIndexes = prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target);
+      }
+
+      var firstPossibleI = matchesSimple[0]===0 ? 0 : nextBeginningIndexes[matchesSimple[0]-1];
+
+      targetI = firstPossibleI;
+
+      /*
+       * Our target string successfully matched all characters in sequence!
+       * Let's try a more advanced and strict test to improve the score
+       * only count it as a match if it's consecutive or a beginning character!
+       */
       if(targetI !== targetLen)
-        strictSearchLabel: for(;;) {
+        for(;;) {
           if(targetI >= targetLen) {
-            // We failed to find a good spot for this search char, go back to the previous search char and force it forward
+            /* We failed to find a good spot for this search char, go back to the previous search char and force it forward */
             if(searchI <= 0) { // We failed to push chars forward for a better match
-              // transpose, starting from the beginning
-              ++typoStrictI; if(typoStrictI > searchLen-2) break
-              if(searchLowerCodes[matchesSimple[typoStrictI]] === searchLowerCodes[matchesSimple[typoStrictI+1]]) continue // doesn't make sense to transpose a repeat char
-              targetI = firstPossibleI
-              continue
+              /* transpose, starting from the beginning */
+              ++typoStrictI;
+
+              if(typoStrictI > searchLen-2) {
+                break;
+              }
+
+              /* doesn't make sense to transpose a repeat char */
+              if(searchLowerCodes[matchesSimple[typoStrictI]] === searchLowerCodes[matchesSimple[typoStrictI+1]]) {
+                continue;
+              }
+
+              targetI = firstPossibleI;
+              continue;
             }
 
-            --searchI
-            var lastMatch = matchesStrict[--matchesStrictLen]
-            targetI = nextBeginningIndexes[lastMatch]
+            --searchI;
 
+            var lastMatch = matchesStrict[--matchesStrictLen];
+
+            targetI = nextBeginningIndexes[lastMatch];
           } else {
             var searchLowerCodeI = matchesSimple[typoStrictI===0?searchI : (typoStrictI===searchI?searchI+1 : (typoStrictI===searchI-1?searchI-1 : searchI))];
+            // console.log('typoStrictI: ', typoStrictI);
+            // console.log('searchI: ', searchI);
+            // console.log('matchesSimple: ', matchesSimple);
+            // console.log('searchLowerCodes[searchLowerCodeI]: ', searchLowerCodes[searchLowerCodeI]);
+            // console.log('targetLowerCodes[targetI]: ', targetLowerCodes[targetI]);
 
             if(searchLowerCodes[searchLowerCodeI] === targetLowerCodes[targetI]) {
-              matchesStrict[matchesStrictLen++] = targetI
-              ++searchI; if(searchI === searchLen) { successStrict = true; break }
-              ++targetI
+              matchesStrict[matchesStrictLen++] = targetI;
+              ++searchI;
+
+              if(searchI === searchLen) {
+                successStrict = true;
+                break;
+              }
+
+              ++targetI;
             } else {
-              targetI = nextBeginningIndexes[targetI]
+              targetI = nextBeginningIndexes[targetI];
             }
           }
         }
 
-      { // tally up the score & keep track of matches for highlighting later
-        if(successStrict) {
-          var matchesBest = matchesStrict;
-          var matchesBestLen = matchesStrictLen;
-        } else {
-          var matchesBest = matchesSimple;
-          var matchesBestLen = matchesSimpleLen;
+      /* tally up the score & keep track of matches for highlighting later */
+      var lastTargetI = -1;
+
+      for(var i = 0; i < matchesSimpleLen; ++i) {
+        var targetI = matchesSimple[i];
+
+        /* score only goes down if they're not consecutive */
+        if(lastTargetI !== targetI - 1) {
+          score -= targetI;
         }
 
-        var score = 0
-        var lastTargetI = -1
-
-        for(var i = 0; i < matchesBestLen; ++i) {
-          var targetI = matchesBest[i]
-          // score only goes down if they're not consecutive
-          if(lastTargetI !== targetI - 1) {
-            score -= targetI
-          }
-
-          lastTargetI = targetI
-        }
-
-        if(!successStrict) {
-          score *= 1000
-        }
-
-        /*typoPenalty*/
-        if(typoSimpleI !== 0) {
-          score += -20
-        }
-
-        score -= targetLen - matchesBestLen;
-        prepared.score = score;
-        prepared.indexes = new Array(matchesBestLen); for(var i = matchesBestLen - 1; i >= 0; --i) prepared.indexes[i] = matchesBest[i]
-
-        return prepared
+        lastTargetI = targetI;
       }
+
+      if(!successStrict) {
+        score *= 1000;
+      }
+
+      /*typoPenalty*/
+      if(isTypoExists) {
+        score += -20;
+      }
+
+      score -= targetLen - matchesSimpleLen;
+      prepared.score = score;
+      prepared.indexes = new Array(matchesSimpleLen);
+
+      for(var i = matchesSimpleLen - 1; i >= 0; --i) {
+        prepared.indexes[i] = matchesSimple[i];
+      }
+
+      return prepared;
     },
 
     algorithmNoTypo: function(searchLowerCodes, prepared, searchLowerCode) {
