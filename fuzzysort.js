@@ -55,6 +55,7 @@ USAGE:
       var errorThreshold = options && options.errorThreshold!==undefined ? options.errorThreshold
           : instanceOptions && instanceOptions.errorThreshold!==undefined ? instanceOptions.errorThreshold : null;
       var keyOption = options && options.key !==undefined ? options.key : instanceOptions && instanceOptions.key;
+      var keysOption = options && options.keys !==undefined ? options.keys : instanceOptions && instanceOptions.keys;
       var resultsLen = 0;
       var limitedCount = 0;
       var targetsLen = targets.length;
@@ -64,29 +65,73 @@ USAGE:
       // This code is copy/pasted 3 times for performance reasons [options.keys, options.key, no keys]
 
       // options.keys
-      if(options && options.keys) {
+      if(keysOption) {
         var scoreFn = options.scoreFn || defaultScoreFn
-        var keys = options.keys
+        var keys = keysOption
         var keysLen = keys.length
-        for(var i = targetsLen - 1; i >= 0; --i) { var obj = targets[i]
-          var objResults = new Array(keysLen)
-          for (var keyI = keysLen - 1; keyI >= 0; --keyI) {
-            var key = keys[keyI]
-            var target = getValue(obj, key)
-            if(!target) { objResults[keyI] = null; continue }
-            if(!isObj(target)) target = fuzzysort.getPrepared(target)
 
-            objResults[keyI] = algorithm(search, target, searchLowerCode, typosNumber)
+        if (errorThreshold) {
+          for(var i = targetsLen - 1; i >= 0; --i) { var obj = targets[i]
+            var objResults = new Array(keysLen)
+            for (var keyI = keysLen - 1; keyI >= 0; --keyI) {
+              var key = keys[keyI]
+              var target = getValue(obj, key)
+              if(!target) { objResults[keyI] = null; continue }
+              if(!isObj(target)) target = fuzzysort.getPrepared(target)
+
+              /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
+              if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+                objResults[keyI] = null;
+                continue;
+              }
+
+              objResults[keyI] = algorithm(search, target, searchLowerCode, typosNumber)
+            }
+            objResults.obj = obj; // before scoreFn so scoreFn can use it
+            var score = scoreFn(objResults);
+
+            if(score === null
+                || score < threshold
+                || (resultsLen >= errorThresholdAfter
+                    && score <= (q.peek().score + errorThreshold))) {
+              continue;
+            }
+
+            objResults.score = score;
+            if(resultsLen < limit) { q.add(objResults); ++resultsLen }
+            else {
+              ++limitedCount;
+              if(score > q.peek().score) q.replaceTop(objResults)
+            }
           }
-          objResults.obj = obj // before scoreFn so scoreFn can use it
-          var score = scoreFn(objResults)
-          if(score === null) continue
-          if(score < threshold) continue
-          objResults.score = score
-          if(resultsLen < limit) { q.add(objResults); ++resultsLen }
-          else {
-            ++limitedCount
-            if(score > q.peek().score) q.replaceTop(objResults)
+        } else {
+          /* options.keys search without errorThreshold option */
+          for(var i = targetsLen - 1; i >= 0; --i) { var obj = targets[i]
+            var objResults = new Array(keysLen)
+            for (var keyI = keysLen - 1; keyI >= 0; --keyI) {
+              var key = keys[keyI]
+              var target = getValue(obj, key)
+              if(!target) { objResults[keyI] = null; continue }
+              if(!isObj(target)) target = fuzzysort.getPrepared(target)
+
+              /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
+              if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+                objResults[keyI] = null;
+                continue;
+              }
+
+              objResults[keyI] = algorithm(search, target, searchLowerCode, typosNumber)
+            }
+            objResults.obj = obj // before scoreFn so scoreFn can use it
+            var score = scoreFn(objResults)
+            if(score === null) continue
+            if(score < threshold) continue
+            objResults.score = score
+            if(resultsLen < limit) { q.add(objResults); ++resultsLen }
+            else {
+              ++limitedCount
+              if(score > q.peek().score) q.replaceTop(objResults)
+            }
           }
         }
 
