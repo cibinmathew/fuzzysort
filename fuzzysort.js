@@ -42,21 +42,18 @@ USAGE:
     },
 
     go: function(search, targets, options) {
-      if(!search) return noResults
+      if(!search) return noResults;
       search = fuzzysort.prepareSearch(search);
       var searchLowerCode = search[0];
-      var typosNumber = typosNum ? typosNum : 1;
+      var typosNumber = options && options.typosNumber || instanceOptions && instanceOptions.typosNumber || 1;
       var threshold = options && options.threshold || instanceOptions && instanceOptions.threshold || -9007199254740991;
       var limit = options && options.limit || instanceOptions && instanceOptions.limit || 9007199254740991;
       var allowTypo = options && options.allowTypo!==undefined ? options.allowTypo
-        : instanceOptions && instanceOptions.allowTypo!==undefined ? instanceOptions.allowTypo
-        : true;
+        : instanceOptions && instanceOptions.allowTypo!==undefined ? instanceOptions.allowTypo : true;
       var applyErrorThresholdAfter = options && options.applyErrorThresholdAfter!==undefined ? options.applyErrorThresholdAfter
-          : instanceOptions && instanceOptions.applyErrorThresholdAfter!==undefined ? instanceOptions.applyErrorThresholdAfter
-              : null;
+          : instanceOptions && instanceOptions.applyErrorThresholdAfter!==undefined ? instanceOptions.applyErrorThresholdAfter : null;
       var errorThreshold = options && options.errorThreshold!==undefined ? options.errorThreshold
-          : instanceOptions && instanceOptions.errorThreshold!==undefined ? instanceOptions.errorThreshold
-              : null;
+          : instanceOptions && instanceOptions.errorThreshold!==undefined ? instanceOptions.errorThreshold : null;
       var resultsLen = 0;
       var limitedCount = 0;
       var targetsLen = targets.length;
