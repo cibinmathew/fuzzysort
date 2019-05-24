@@ -41,19 +41,27 @@ USAGE:
       // return result
     },
 
-    go: function(search, targets, options, typosNum) {
+    go: function(search, targets, options) {
       if(!search) return noResults
-      search = fuzzysort.prepareSearch(search)
-      var searchLowerCode = search[0]
-      var typosNumber = typosNum ? typosNum : 1
-      var threshold = options && options.threshold || instanceOptions && instanceOptions.threshold || -9007199254740991
-      var limit = options && options.limit || instanceOptions && instanceOptions.limit || 9007199254740991
+      search = fuzzysort.prepareSearch(search);
+      var searchLowerCode = search[0];
+      var typosNumber = typosNum ? typosNum : 1;
+      var threshold = options && options.threshold || instanceOptions && instanceOptions.threshold || -9007199254740991;
+      var limit = options && options.limit || instanceOptions && instanceOptions.limit || 9007199254740991;
       var allowTypo = options && options.allowTypo!==undefined ? options.allowTypo
         : instanceOptions && instanceOptions.allowTypo!==undefined ? instanceOptions.allowTypo
-        : true
-      var resultsLen = 0; var limitedCount = 0
-      var targetsLen = targets.length
-      var algorithm = allowTypo ? fuzzysort.algorithm : fuzzysort.algorithmNoTypo
+        : true;
+      var applyErrorThresholdAfter = options && options.applyErrorThresholdAfter!==undefined ? options.applyErrorThresholdAfter
+          : instanceOptions && instanceOptions.applyErrorThresholdAfter!==undefined ? instanceOptions.applyErrorThresholdAfter
+              : null;
+      var errorThreshold = options && options.errorThreshold!==undefined ? options.errorThreshold
+          : instanceOptions && instanceOptions.errorThreshold!==undefined ? instanceOptions.errorThreshold
+              : null;
+      var resultsLen = 0;
+      var limitedCount = 0;
+      var targetsLen = targets.length;
+      var algorithm = allowTypo ? fuzzysort.algorithm : fuzzysort.algorithmNoTypo;
+      var errorThresholdAfter = applyErrorThresholdAfter && applyErrorThresholdAfter < limit ? applyErrorThresholdAfter : 0;
 
       // This code is copy/pasted 3 times for performance reasons [options.keys, options.key, no keys]
 
@@ -108,26 +116,94 @@ USAGE:
 
       // no keys
       } else {
-        for(var i = targetsLen - 1; i >= 0; --i) { var target = targets[i]
-          if(!target) continue
-          if(!isObj(target)) target = fuzzysort.getPrepared(target)
+        if (errorThreshold) {
+          for (var i = targetsLen - 1; i >= 0; --i) {
+            var target = targets[i];
 
-          var result = algorithm(search, target, searchLowerCode, typosNumber)
-          if(result === null) continue
-          if(result.score < threshold) continue
-          if(resultsLen < limit) { q.add(result); ++resultsLen }
-          else {
-            ++limitedCount
-            if(result.score > q.peek().score) q.replaceTop(result)
+            if(!target) {
+              continue;
+            }
+
+            if(!isObj(target)) target = fuzzysort.getPrepared(target);
+
+            /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
+            if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+              continue;
+            }
+
+            var result = algorithm(search, target, searchLowerCode, typosNumber);
+
+            if(result === null
+                || result.score < threshold
+                || (resultsLen > errorThresholdAfter
+                    && result.score < (q.peek().score + errorThreshold))) {
+              continue;
+            }
+
+            if(resultsLen < limit) {
+              q.add(result);
+              ++resultsLen;
+            } else {
+              ++limitedCount;
+
+              if(result.score > q.peek().score) {
+                q.replaceTop(result)
+              }
+            }
+          }
+        } else {
+          /* Search without errorThreshold option */
+          for (var i = targetsLen - 1; i >= 0; --i) {
+            var target = targets[i];
+
+            if(!target) {
+              continue;
+            }
+
+            if(!isObj(target)) target = fuzzysort.getPrepared(target);
+
+            /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
+            if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+              continue;
+            }
+
+            var result = algorithm(search, target, searchLowerCode, typosNumber);
+
+            if(result === null) {
+              continue;
+            }
+
+            if(result.score < threshold) {
+              continue;
+            }
+
+            if(resultsLen < limit) {
+              q.add(result);
+              ++resultsLen;
+            } else {
+              ++limitedCount;
+
+              if(result.score > q.peek().score) {
+                q.replaceTop(result)
+              }
+            }
           }
         }
       }
 
-      if(resultsLen === 0) return noResults
-      var results = new Array(resultsLen)
-      for(var i = resultsLen - 1; i >= 0; --i) results[i] = q.poll()
-      results.total = resultsLen + limitedCount
-      return results
+      if(resultsLen === 0) {
+        return noResults;
+      }
+
+      var results = new Array(resultsLen);
+
+      for (var i = resultsLen - 1; i >= 0; --i) {
+        results[i] = q.poll();
+      }
+
+      results.total = resultsLen + limitedCount;
+
+      return results;
     },
 
     goAsync: function(search, targets, options) {
@@ -333,6 +409,22 @@ USAGE:
       var targetI = 0; // where you at
       var matchesSimpleLen = 0;
       var score = 0;
+      var lastMatchI = 0;
+      /*
+       * Special score coefficient
+       * (10% match -> score *= 1000)
+       */
+      var scoreMatchCoeffs = {
+        90: 2,
+        80: 5,
+        70: 10,
+        60: 50,
+        50: 100,
+        40: 250,
+        30: 500,
+        20: 750,
+        10: 1000
+      };
 
       /*  get clean array for each call */
       matchesSimple = [];
@@ -355,11 +447,11 @@ USAGE:
             ++searchI;
             --targetI;
           } else {
-            var lastMatchI = searchI;
+            lastMatchI = searchI;
 
             isTypoExists = true;
 
-            for (var excessTyposNumber = 0; excessTyposNumber < typosNum; excessTyposNumber++) {
+            excessTyposLabel: for (var excessTyposNumber = 0; excessTyposNumber < typosNum; excessTyposNumber++) {
               /* Inner check on missing letters */
               for (var missingCharsNumber = 1; missingCharsNumber <= typosNum; missingCharsNumber++) {
                 if (searchLowerCode === targetLowerCodes[targetI + missingCharsNumber]) {
@@ -367,7 +459,8 @@ USAGE:
                   searchI = lastMatchI;
                   matchesSimple[matchesSimpleLen++] = targetI + missingCharsNumber;
                   targetI = targetI + missingCharsNumber;
-                  break;
+
+                  break excessTyposLabel;
                 }
               }
 
@@ -382,6 +475,7 @@ USAGE:
               if (searchLowerCode === spaceCharCode) {
                 ++lastMatchI;
                 searchI = lastMatchI;
+
                 continue;
               }
 
@@ -389,9 +483,39 @@ USAGE:
                 ++lastMatchI;
                 searchI = lastMatchI;
                 matchesSimple[matchesSimpleLen++] = targetI;
+
                 break;
               }
             }
+          }
+
+          /* Check if first match is not the first letter of the target */
+          if (matchesSimpleLen === 1
+              && matchesSimple[0] !== 0) {
+            return null;
+          }
+
+          /* Returns result with the highest score when all matches completely fit target string */
+          if (matchesSimpleLen === targetLen) {
+            score -= searchLen - matchesSimpleLen;
+
+            /*typoPenalty*/
+            if(isTypoExists) {
+              score += -20;
+            }
+
+            if (!prepared._nextBeginningIndexes) {
+              prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target);
+            }
+
+            prepared.score = score;
+            prepared.indexes = new Array(matchesSimpleLen);
+
+            for(var i = matchesSimpleLen - 1; i >= 0; --i) {
+              prepared.indexes[i] = matchesSimple[i];
+            }
+
+            return prepared;
           }
 
           if(searchI === searchLen
@@ -402,29 +526,7 @@ USAGE:
           searchLowerCode = searchLowerCodes[searchI];
         }
 
-        /* Check if first match is the first letter of the target */
-        if (matchesSimpleLen === 1
-            && matchesSimple[0] !== 0) {
-          return null;
-        }
-
         ++targetI;
-
-        /* */
-        if (matchesSimpleLen === targetLen) {
-          if (!prepared._nextBeginningIndexes) {
-            prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target);
-          }
-
-          prepared.score = score;
-          prepared.indexes = new Array(matchesSimpleLen);
-
-          for(var i = matchesSimpleLen - 1; i >= 0; --i) {
-            prepared.indexes[i] = matchesSimple[i];
-          }
-
-          return prepared;
-        }
 
         if (targetI >= targetLen) {
           break;
@@ -435,93 +537,36 @@ USAGE:
         return null;
       }
 
-      console.log("matchesSimple: ", matchesSimple);
-
-      searchI = 0;
-      var typoStrictI = 0;
-      var successStrict = false;
-      var matchesStrictLen = 0;
-      var nextBeginningIndexes = prepared._nextBeginningIndexes;
-
-      if(nextBeginningIndexes === null) {
-        nextBeginningIndexes = prepared._nextBeginningIndexes = fuzzysort.prepareNextBeginningIndexes(prepared.target);
-      }
-
-      var firstPossibleI = matchesSimple[0]===0 ? 0 : nextBeginningIndexes[matchesSimple[0]-1];
-
-      targetI = firstPossibleI;
-
-      /*
-       * Our target string successfully matched all characters in sequence!
-       * Let's try a more advanced and strict test to improve the score
-       * only count it as a match if it's consecutive or a beginning character!
-       */
-      if(targetI !== targetLen)
-        for(;;) {
-          if(targetI >= targetLen) {
-            /* We failed to find a good spot for this search char, go back to the previous search char and force it forward */
-            if(searchI <= 0) { // We failed to push chars forward for a better match
-              /* transpose, starting from the beginning */
-              ++typoStrictI;
-
-              if(typoStrictI > searchLen-2) {
-                break;
-              }
-
-              /* doesn't make sense to transpose a repeat char */
-              if(searchLowerCodes[matchesSimple[typoStrictI]] === searchLowerCodes[matchesSimple[typoStrictI+1]]) {
-                continue;
-              }
-
-              targetI = firstPossibleI;
-              continue;
-            }
-
-            --searchI;
-
-            var lastMatch = matchesStrict[--matchesStrictLen];
-
-            targetI = nextBeginningIndexes[lastMatch];
-          } else {
-            var searchLowerCodeI = matchesSimple[typoStrictI===0?searchI : (typoStrictI===searchI?searchI+1 : (typoStrictI===searchI-1?searchI-1 : searchI))];
-            // console.log('typoStrictI: ', typoStrictI);
-            // console.log('searchI: ', searchI);
-            // console.log('matchesSimple: ', matchesSimple);
-            // console.log('searchLowerCodes[searchLowerCodeI]: ', searchLowerCodes[searchLowerCodeI]);
-            // console.log('targetLowerCodes[targetI]: ', targetLowerCodes[targetI]);
-
-            if(searchLowerCodes[searchLowerCodeI] === targetLowerCodes[targetI]) {
-              matchesStrict[matchesStrictLen++] = targetI;
-              ++searchI;
-
-              if(searchI === searchLen) {
-                successStrict = true;
-                break;
-              }
-
-              ++targetI;
-            } else {
-              targetI = nextBeginningIndexes[targetI];
-            }
-          }
-        }
-
       /* tally up the score & keep track of matches for highlighting later */
       var lastTargetI = -1;
+      /* The value of matches percent (how many chars have been found from target string as percent value) */
+      var matchesPercent = Math.round((matchesSimpleLen / targetLen * 100) / 10) * 10;
 
-      for(var i = 0; i < matchesSimpleLen; ++i) {
-        var targetI = matchesSimple[i];
-
-        /* score only goes down if they're not consecutive */
-        if(lastTargetI !== targetI - 1) {
-          score -= targetI;
-        }
-
-        lastTargetI = targetI;
+      if (matchesPercent === 0) {
+        return null;
       }
 
-      if(!successStrict) {
-        score *= 1000;
+      // console.log('matchesSimple: ', matchesSimple);
+      // console.log('matchesPercent: ', matchesPercent);
+      // console.log('targetLen: ', targetLen);
+
+      if (matchesPercent < 50) {
+        for(var i = 0; i < matchesSimpleLen; ++i) {
+          var targetI = matchesSimple[i];
+
+          /* score only goes down if they're not consecutive */
+          if(lastTargetI !== targetI - 1) {
+            score -= targetI;
+          }
+
+          lastTargetI = targetI;
+        }
+      }
+
+      score -= searchLen - matchesSimpleLen;
+
+      if (matchesPercent && scoreMatchCoeffs[matchesPercent]) {
+        score *= scoreMatchCoeffs[matchesPercent];
       }
 
       /*typoPenalty*/
