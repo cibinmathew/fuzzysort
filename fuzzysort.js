@@ -54,6 +54,7 @@ USAGE:
           : instanceOptions && instanceOptions.applyErrorThresholdAfter!==undefined ? instanceOptions.applyErrorThresholdAfter : null;
       var errorThreshold = options && options.errorThreshold!==undefined ? options.errorThreshold
           : instanceOptions && instanceOptions.errorThreshold!==undefined ? instanceOptions.errorThreshold : null;
+      var keyOption = options && options.key !==undefined ? options.key : instanceOptions && instanceOptions.key;
       var resultsLen = 0;
       var limitedCount = 0;
       var targetsLen = targets.length;
@@ -90,26 +91,66 @@ USAGE:
         }
 
       // options.key
-      } else if(options && options.key) {
-        var key = options.key
-        for(var i = targetsLen - 1; i >= 0; --i) { var obj = targets[i]
-          var target = getValue(obj, key)
-          if(!target) continue
-          if(!isObj(target)) target = fuzzysort.getPrepared(target)
+      } else if(keyOption) {
+       if (errorThreshold) {
+         for(var i = targetsLen - 1; i >= 0; --i) {
+           var obj = targets[i];
+           var target = getValue(obj, keyOption);
+           if(!target) continue;
+           if(!isObj(target)) target = fuzzysort.getPrepared(target);
 
-          var result = algorithm(search, target, searchLowerCode, typosNumber)
-          if(result === null) continue
-          if(result.score < threshold) continue
+           /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
+           if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+             continue;
+           }
 
-          // have to clone result so duplicate targets from different obj can each reference the correct obj
-          result = {target:result.target, _targetLowerCodes:null, _nextBeginningIndexes:null, score:result.score, indexes:result.indexes, obj:obj} // hidden
+           var result = algorithm(search, target, searchLowerCode, typosNumber);
 
-          if(resultsLen < limit) { q.add(result); ++resultsLen }
-          else {
-            ++limitedCount
-            if(result.score > q.peek().score) q.replaceTop(result)
-          }
-        }
+           if(result === null
+               || result.score < threshold
+               || (resultsLen >= errorThresholdAfter
+                   && result.score <= (q.peek().score + errorThreshold))) {
+             continue;
+           }
+
+           if(result.score < threshold) continue;
+
+           // have to clone result so duplicate targets from different obj can each reference the correct obj
+           result = {target:result.target, _targetLowerCodes:null, _nextBeginningIndexes:null, score:result.score, indexes:result.indexes, obj:obj} // hidden
+
+           if(resultsLen < limit) { q.add(result); ++resultsLen }
+           else {
+             ++limitedCount
+             if(result.score > q.peek().score) q.replaceTop(result)
+           }
+         }
+       } else {
+         /* options.key search without errorThreshold option */
+         for(var i = targetsLen - 1; i >= 0; --i) {
+           var obj = targets[i];
+           var target = getValue(obj, keyOption);
+           if(!target) continue;
+           if(!isObj(target)) target = fuzzysort.getPrepared(target);
+
+           /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
+           if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+             continue;
+           }
+
+           var result = algorithm(search, target, searchLowerCode, typosNumber);
+           if(result === null) continue;
+           if(result.score < threshold) continue;
+
+           // have to clone result so duplicate targets from different obj can each reference the correct obj
+           result = {target:result.target, _targetLowerCodes:null, _nextBeginningIndexes:null, score:result.score, indexes:result.indexes, obj:obj} // hidden
+
+           if(resultsLen < limit) { q.add(result); ++resultsLen }
+           else {
+             ++limitedCount
+             if(result.score > q.peek().score) q.replaceTop(result)
+           }
+         }
+       }
 
       // no keys
       } else {
@@ -149,7 +190,7 @@ USAGE:
             }
           }
         } else {
-          /* Search without errorThreshold option */
+          /* no keys search without errorThreshold option */
           for (var i = targetsLen - 1; i >= 0; --i) {
             var target = targets[i];
 

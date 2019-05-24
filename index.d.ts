@@ -65,7 +65,7 @@ declare namespace Fuzzysort {
     /** Quantity of wrong characters (typos) that can be found between matched letters */
     typosNumber?: number;
 
-    /** The value of threshold that will be added to the score of best result
+    /** The (negative) value of threshold that will be added to the score of best result
      * (All rest results should pass next check -> current score < best match from queue + errorThreshold)
      */
     errorThreshold?: number;

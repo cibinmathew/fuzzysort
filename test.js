@@ -205,7 +205,10 @@ if(isNode) fuzzysort = require('./fuzzysort')
 // Config
   fuzzysort = fuzzysort.new({
     limit: 100,
-    // threshold: 999,
+    allowTypo: true,
+    key: 'str',
+    errorThreshold: -1,
+    applyErrorThresholdAfter: 1
   })
   const benchmark_duration = 2
 
