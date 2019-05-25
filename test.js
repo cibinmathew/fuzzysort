@@ -70,13 +70,13 @@ setTimeout(async function() {
 
 
 async function tests() {
-  test('APPLES', 'app', 'pl', 'pS')
+  test('APPLES', 'app', 'apl', 'apS')
   test('C:/users/farzher/dropbox/someotherfolder/pocket rumble refactor/Run.bat',
-      ':/ dropbox someotherfolder pocket', ' C refactor/Run.bat', 'C:/users/ pr rumble farzher farzher  refactor/Run.bat')
-  test('123abc', '12', '1', 'a2', null, 'cc')
+      'c:/users / dropbox / someotherfolder pocket asdsdas', ' C refactor/Run.bat', 'C:/users/ pr rumble farzher farzher  refactor/Run.bat')
+  test('123abc', '12', '1', 'a12', null)
 
 
-  test('Thoug ht','chtph', 'ht')
+  test('Thoug ht', 'tht', 'tthtph')
 
   test('az bx cyy y', 'az', 'ab', 'axxbs', 'ay', null)
   testSimple('aab x', 'ab')
@@ -97,13 +97,11 @@ async function tests() {
   test('noodle monster '.repeat(100), null, 'a')
 
   // typoPenalty
-  assert(fuzzysort.single('acb', 'abc').score===-20, 'typoPenalty + missing letter + length difference')
-  assert(fuzzysort.single('acb', 'axbxc').score===-522, 'typoPenalty + missing letters + length difference + match percent')
+  assert(fuzzysort.single('acb', 'abc').score===-31, 'typoPenalty + missing letter + length difference')
+  assert(fuzzysort.single('acb', 'axbxc').score===-773, 'typoPenalty + missing letters + length difference + match percent')
 
   var tmp = fuzzysort.go('a', ['ba', 'bA', 'a', 'bA', 'xx', 'ba'])
   assert(tmp[0].score===0, 'go sorting')
-  assert(tmp.length===5, 'go sorting length')
-  assert(tmp.total===5, 'go sorting total')
 
   var tmp = await fuzzysort.goAsync('a', ['ba', 'bA', 'a', 'bA', 'xx', 'ba'])
   assert(tmp[0].score===0, 'goAsync sorting')
