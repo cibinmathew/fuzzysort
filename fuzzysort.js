@@ -32,8 +32,9 @@ USAGE:
       var allowTypo = options && options.allowTypo!==undefined ? options.allowTypo
         : instanceOptions && instanceOptions.allowTypo!==undefined ? instanceOptions.allowTypo
         : true
+      var typosNumber = options && options.typosNumber || instanceOptions && instanceOptions.typosNumber || 1;
       var algorithm = allowTypo ? fuzzysort.algorithm : fuzzysort.algorithmNoTypo
-      return algorithm(search, target, search[0])
+      return algorithm(search, target, search[0], typosNumber)
       // var threshold = options && options.threshold || instanceOptions && instanceOptions.threshold || -9007199254740991
       // var result = algorithm(search, target, search[0])
       // if(result === null) return null
@@ -66,21 +67,22 @@ USAGE:
 
       // options.keys
       if(keysOption) {
-        var scoreFn = options.scoreFn || defaultScoreFn
-        var keys = keysOption
-        var keysLen = keys.length
+        var scoreFn = options && options.scoreFn || instanceOptions && instanceOptions.scoreFn || defaultScoreFn;
+        var keys = keysOption;
+        var keysLen = keys.length;
 
         if (errorThreshold) {
-          for(var i = targetsLen - 1; i >= 0; --i) { var obj = targets[i]
-            var objResults = new Array(keysLen)
+          for(var i = targetsLen - 1; i >= 0; --i) {
+            var obj = targets[i];
+            var objResults = new Array(keysLen);
             for (var keyI = keysLen - 1; keyI >= 0; --keyI) {
-              var key = keys[keyI]
-              var target = getValue(obj, key)
+              var key = keys[keyI];
+              var target = getValue(obj, key);
               if(!target) { objResults[keyI] = null; continue }
-              if(!isObj(target)) target = fuzzysort.getPrepared(target)
+              if(!isObj(target)) target = fuzzysort.getPrepared(target);
 
               /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
-              if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+              if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 3) {
                 objResults[keyI] = null;
                 continue;
               }
@@ -115,7 +117,7 @@ USAGE:
               if(!isObj(target)) target = fuzzysort.getPrepared(target)
 
               /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
-              if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+              if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 3) {
                 objResults[keyI] = null;
                 continue;
               }
@@ -145,7 +147,7 @@ USAGE:
            if(!isObj(target)) target = fuzzysort.getPrepared(target);
 
            /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
-           if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+           if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 3) {
              continue;
            }
 
@@ -178,7 +180,7 @@ USAGE:
            if(!isObj(target)) target = fuzzysort.getPrepared(target);
 
            /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
-           if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+           if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 3) {
              continue;
            }
 
@@ -210,7 +212,7 @@ USAGE:
             if(!isObj(target)) target = fuzzysort.getPrepared(target);
 
             /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
-            if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+            if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 3) {
               continue;
             }
 
@@ -246,7 +248,7 @@ USAGE:
             if(!isObj(target)) target = fuzzysort.getPrepared(target);
 
             /* Skip target string if it supposes to be very small related to search query (for performance reasons) */
-            if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 2) {
+            if (search.length - target._targetLowerCodes.length >= target._targetLowerCodes.length * 3) {
               continue;
             }
 
@@ -572,15 +574,15 @@ USAGE:
             }
           }
 
-          /* Check if first match is not the first letter of the target */
+          /* Check if first match is not the first or second letter of the target */
           if (matchesSimpleLen === 1
-              && matchesSimple[0] !== 0) {
+              && matchesSimple[0] > 1) {
             return null;
           }
 
           /* Returns result with the highest score when all matches completely fit target string */
           if (matchesSimpleLen === targetLen) {
-            score -= searchLen - matchesSimpleLen;
+            score -= -(searchLen - matchesSimpleLen);
 
             /*typoPenalty*/
             if(isTypoExists) {
@@ -629,10 +631,6 @@ USAGE:
         return null;
       }
 
-      // console.log('matchesSimple: ', matchesSimple);
-      // console.log('matchesPercent: ', matchesPercent);
-      // console.log('targetLen: ', targetLen);
-
       if (matchesPercent < 50) {
         for(var i = 0; i < matchesSimpleLen; ++i) {
           var targetI = matchesSimple[i];
@@ -646,11 +644,11 @@ USAGE:
         }
       }
 
-      score -= searchLen - matchesSimpleLen;
-
       if (matchesPercent && scoreMatchCoeffs[matchesPercent]) {
         score *= scoreMatchCoeffs[matchesPercent];
       }
+
+      score -= -(searchLen - matchesSimpleLen);
 
       /*typoPenalty*/
       if(isTypoExists) {
