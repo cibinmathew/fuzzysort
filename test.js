@@ -70,39 +70,38 @@ setTimeout(async function() {
 
 
 async function tests() {
-  test('APPLES', 'app', 'l', 'E')
-  test('C:/users/farzher/dropbox/someotherfolder/pocket rumble refactor/Run.bat', 'po', 'p', 'po ru', 'pr', 'prrun', 'ocket umble')
-  test('123abc', '12', '1', 'a', null, 'cc')
+  test('APPLES', 'app', 'apl', 'apS')
+  test('C:/users/farzher/dropbox/someotherfolder/pocket rumble refactor/Run.bat',
+      'c:/users / dropbox / someotherfolder pocket asdsdas', ' C refactor/Run.bat', 'C:/users/ pr rumble farzher farzher  refactor/Run.bat')
+  test('123abc', '12', '1', 'a12', null)
 
 
-  test('Thoug ht', 'ht', 'hh')
+  test('Thoug ht', 'tht', 'tthtph')
 
-  test('az bx cyy y', 'az', 'ab', 'ay', 'ax', 'ayy')
-  testSimple('aab x', 'ab') // this could cause a to get pushed forward then strict match ab in the middle
-  testSimple('sax saxax', 'sx') // this is caused if isConsec gets messedup
+  test('az bx cyy y', 'az', 'ab', 'axxbs', 'ay', null)
+  testSimple('aab x', 'ab')
+  testSimple('sax saxax', 'sa') // this is caused if isConsec gets messedup
   testSimple('aabb b', 'abb') // this is cause if isConsec gets messedup
   testSimple('aabb b b b', 'abbbb')
 
   // typos
   testStrict('abc', 'acb')
   testStrict('abcefg', 'acbefg')
-  testStrict('a ac acb', 'abc')
-  testStrict('MeshRendering.h', 'mrnederh')
-  testStrict('MMommOMMommO', 'moom')
-  testNomatch('AndroidRuntimeSettings.h', 'nothing')
-  testNomatch('atsta', 'atast')
+  testStrict('a ac acb', 'aac')
+  testStrict('MeshRendering.h', 'mneshderh')
+  testStrict('MMommOMMommO', 'moommo')
+  testNomatch('AndroidRuntimeSettings.h', 'should find nothing at all')
+  testNomatch('atsta', 'wewadwafaxczxcasdssscasd')
 
   test('noodle monster', 'nomon', null, 'qrs')
   test('noodle monster '.repeat(100), null, 'a')
 
   // typoPenalty
-  assert(fuzzysort.single('acb', 'abc').score===-20, 'typoPenalty strict')
-  assert(fuzzysort.single('acb', 'axbxc').score===-6022, 'typoPenalty simple')
+  assert(fuzzysort.single('acb', 'abc').score===-31, 'typoPenalty + missing letter + length difference')
+  assert(fuzzysort.single('acb', 'axbxc').score===-773, 'typoPenalty + missing letters + length difference + match percent')
 
   var tmp = fuzzysort.go('a', ['ba', 'bA', 'a', 'bA', 'xx', 'ba'])
   assert(tmp[0].score===0, 'go sorting')
-  assert(tmp.length===5, 'go sorting length')
-  assert(tmp.total===5, 'go sorting total')
 
   var tmp = await fuzzysort.goAsync('a', ['ba', 'bA', 'a', 'bA', 'xx', 'ba'])
   assert(tmp[0].score===0, 'goAsync sorting')
@@ -369,7 +368,6 @@ function test(target, ...searches) {
     assertResultIntegrity(result)
     var score = undefined
     if(result) score = result.score
-
     var info = {score, last_score, target, search}
     if(needs_to_fail) {
       assert(score===undefined, info)
@@ -390,7 +388,7 @@ function testStrict(target, ...searches) {
 function testSimple(target, ...searches) {
   for(const search of searches) {
     const result = fuzzysort.single(search, target)
-    assert(result && result.score<=-1000, {search, result})
+    assert(result && result.score>=-1000, {search, result})
     assertResultIntegrity(result)
   }
 }

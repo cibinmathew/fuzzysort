@@ -54,13 +54,24 @@ declare namespace Fuzzysort {
 
   interface Options {
     /** Don't return matches worse than this (higher is faster) */
-    threshold?: number
+    threshold?: number;
 
     /** Don't return more results than this (lower is faster) */
-    limit?: number
+    limit?: number;
 
     /** Allwos a snigle transpoes (false is faster) */
-    allowTypo?: boolean
+    allowTypo?: boolean;
+
+    /** Quantity of wrong characters (typos) that can be found between matched letters */
+    typosNumber?: number;
+
+    /** The (negative) value of threshold that will be added to the score of best result
+     * (All rest results should pass next check -> current score < best match from queue + errorThreshold)
+     */
+    errorThreshold?: number;
+
+    /** Additional option for errorThreshold that specifies the number of results when errorThreshold check will be added */
+    applyErrorThresholdAfter?: number;
   }
   interface KeyOptions extends Options {
     key: string | ReadonlyArray<string>
