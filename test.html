@@ -49,7 +49,52 @@
           renderCache(cache[testdatakey][inputValue])
           cacheNextLevel()
         } else {
-          renderResults(fuzzysort.go(inputValue, testdata_prepared[testdatakey]))
+                 function permutation_search(search, targets, options) {
+                    function permutations(input) {
+                      var results = []
+                      var used = []
+                      return (function recurse() {
+                        for (var i = 0; i < input.length; i++) {
+                          var word = input.splice(i, 1)[0]
+                          used.push(word)
+                          if (input.length == 0) results.push(used.slice())
+                          recurse(input)
+                          input.splice(i, 0, word)
+                          used.pop()
+                        }
+                        return results
+                      })(input)
+                    }
+                    function remove_duplicates_from_sorted(a) {
+                      return a.filter(function(item, pos, ary) {
+                        return !pos || item != ary[pos - 1]
+                      })
+                    }
+
+                    var search_words = search.split(' ')
+                    var searches = permutations(search_words)
+                    var results = []
+                    for (var i = 0; i < searches.length; i++) {
+                      var search = searches[i].join(' ')
+                      results = results.concat(fuzzysort.go(search, targets, options))
+                    }
+
+                    results.sort(function(a, b) { return b.score - a.score })
+                    return remove_duplicates_from_sorted(results)
+                  }
+        var targets = testdata_prepared[testdatakey] 
+        // console.log(permutation_search('dog cat', targets))
+
+          renderResults(permutation_search(inputValue, targets,{
+  threshold: -Infinity, // Don't return matches worse than this (higher is faster)
+  limit: Infinity, // Don't return more results than this (lower is faster)
+  allowTypo: true, // Allwos a snigle transpoes (false is faster)
+
+  key: null, // For when targets are objects (see its example usage)
+  keys: null, // For when targets are objects (see its example usage)
+  scoreFn: null, // For use with `keys` (see its example usage)
+}))
+          // renderResults(fuzzysort.go(inputValue, testdata_prepared[testdatakey]))
           cacheNextLevel()
         }
 
